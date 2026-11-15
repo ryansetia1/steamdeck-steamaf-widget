@@ -5,7 +5,11 @@
   &nbsp;
   <img src="assets/preview-detail.png" alt="Game detail: verdict, prices and HowLongToBeat" width="300" />
   <br /><br />
+  <img src="assets/preview-media.png" alt="Detail media carousel on a trailer" width="300" />
+  &nbsp;
   <img src="assets/preview-empty.png" alt="Idle: just the search bar" width="300" />
+  <br /><br />
+  <img src="assets/preview-theater.png" alt="Full-screen theater playing a trailer" width="720" />
 </p>
 
 <p align="center">
