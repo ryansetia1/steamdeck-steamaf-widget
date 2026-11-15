@@ -92,6 +92,26 @@ PlasmoidItem {
     property string detailError: ""
     property string detailCmd: ""
 
+    // Optional Main Story hours on each result row (setting: showMainStory)
+    property bool showMainStory: !!(Plasmoid.configuration && Plasmoid.configuration.showMainStory)
+    property var mainHours: ({})       // appId -> hours (0 = no HLTB entry)
+    property string hltbCmd: ""
+    onShowMainStoryChanged: fetchMainHours()
+
+    function fetchMainHours() {
+        if (!showMainStory || results.length === 0) return;
+        var pairs = results.filter(r => mainHours[r.id] === undefined).map(r => [r.id, r.name]);
+        if (pairs.length === 0) return;
+        hltbCmd = "python3 " + q(helper) + " hltb " + q(JSON.stringify(pairs)) + " #" + Date.now();
+        exec.connectSource(hltbCmd);
+    }
+
+    function mergeMainHours(map) {
+        var m = Object.assign({}, mainHours);
+        for (var k in map) m[k] = map[k];
+        mainHours = m;
+    }
+
     function q(s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; }
 
     function runSearch(text) {
@@ -133,7 +153,7 @@ PlasmoidItem {
             if (source === root.searchCmd) {
                 root.searchCmd = "";
                 root.loading = false;
-                if (r.ok) root.results = r.results;
+                if (r.ok) { root.results = r.results; root.fetchMainHours(); }
                 else { root.errorText = r.error; root.results = []; }
             } else if (source === root.detailCmd) {
                 root.detailCmd = "";
@@ -142,9 +162,13 @@ PlasmoidItem {
                     var d = r;
                     d.name = root.detail ? root.detail.name : "";
                     root.detail = d;
+                    if (d.hltb) { var one = {}; one[d.id] = d.hltb.main; root.mergeMainHours(one); }
                 } else {
                     root.detailError = r.error;
                 }
+            } else if (source === root.hltbCmd) {
+                root.hltbCmd = "";
+                if (r.ok) root.mergeMainHours(r.hours);
             }
         }
     }
@@ -468,6 +492,24 @@ PlasmoidItem {
                                                     font.bold: true
                                                 }
                                             }
+                                            // Main Story hours (optional, HLTB)
+                                            Row {
+                                                readonly property real hours: root.mainHours[row.modelData.id] || 0
+                                                visible: root.showMainStory && hours > 0
+                                                spacing: 4
+                                                Rectangle {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    width: 3; height: 10; radius: 1.5
+                                                    color: "#f87171"
+                                                }
+                                                Text {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: root.fmtHours(parent.hours)
+                                                    color: "#cfd8dc"
+                                                    font.pixelSize: 10
+                                                    font.bold: true
+                                                }
+                                            }
                                             Item { Layout.fillWidth: true }
                                             VerdictBadge { verdict: row.modelData.state; small: true }
                                         }
@@ -698,8 +740,8 @@ PlasmoidItem {
                                 spacing: 6
                                 Repeater {
                                     model: root.detail ? [
-                                        { label: "Open in Steam", url: "https://store.steampowered.com/app/" + root.detail.id },
-                                        { label: "Open steamAF", url: "https://steamaf.vercel.app/game/" + root.detail.id }
+                                        { label: "Open in Steam", icon: "steam", url: "https://store.steampowered.com/app/" + root.detail.id },
+                                        { label: "Open steamAF", icon: Qt.resolvedUrl("../icons/steamaf.png"), url: "https://steamaf.vercel.app/game/" + root.detail.id }
                                     ] : []
                                     delegate: Rectangle {
                                         required property var modelData
@@ -709,12 +751,22 @@ PlasmoidItem {
                                         color: linkArea.containsMouse ? root.tileColor("#2f3647") : root.tileColor("#212532")
                                         border.color: root.tileColor("#2c3242")
                                         border.width: 1
-                                        Text {
+                                        Row {
                                             anchors.centerIn: parent
-                                            text: modelData.label
-                                            color: "#cfd8dc"
-                                            font.pixelSize: 11
-                                            font.bold: true
+                                            spacing: 6
+                                            Kirigami.Icon {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 16
+                                                height: 16
+                                                source: modelData.icon
+                                            }
+                                            Text {
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: modelData.label
+                                                color: "#cfd8dc"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                            }
                                         }
                                         MouseArea {
                                             id: linkArea

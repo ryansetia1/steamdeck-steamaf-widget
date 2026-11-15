@@ -32,7 +32,10 @@
   - current price, discount, original price
   - 2-year low and usual sale price, sale countdown when a sale is running
   - **HowLongToBeat** Main / Main+ / 100% times
-  - quick links to the Steam store page and steamAF
+  - quick links (with logos) to the Steam store page and steamAF
+- **Optional Main Story hours on every result** (setting: *Show Main Story hours*): a small
+  red-marked `27h` next to each price, fetched in the background and cached locally for 30 days
+  (`~/.cache/steamaf-widget/hltb.json`) so repeated searches don't hit the API again.
 - **44 Steam regions** – pick your currency in the settings (the `USD` chip in the search bar
   opens them). The choice is saved with the widget.
 - **Solid or Glass background**, designed to sit next to the
@@ -63,6 +66,7 @@ plasmoid/
 └── contents/
     ├── code/steamaf.py        # calls the steamAF API, prints JSON
     ├── config/                # currency + appearance settings
+    ├── icons/steamaf.png      # AF logo for the "Open steamAF" button
     └── ui/
         ├── main.qml           # search card + island (PlasmaCore.Dialog) with results/detail
         ├── VerdictBadge.qml
@@ -76,13 +80,14 @@ The helper only runs when you search or open a game. It uses steamAF's public en
 | Search | `GET /api/search?q=…&cc=…` |
 | Verdict badges for all results (one request) | `GET /api/status/snapshot?appIds=…&cc=…&country=…` |
 | Game detail / verdict | `GET /api/extension/v1/verdict?appId=…&currency=…` (+ `refresh=1` when stale) |
-| HowLongToBeat | `GET /api/hltb?appId=…&title=…` |
+| HowLongToBeat (detail, and per-result Main Story when enabled) | `GET /api/hltb?appId=…&title=…` |
 
 Try it from a terminal:
 
 ```bash
 python3 plasmoid/contents/code/steamaf.py search USD hades
 python3 plasmoid/contents/code/steamaf.py detail IDR 1145360 Hades
+python3 plasmoid/contents/code/steamaf.py hltb '[["1145360", "Hades"]]'
 ```
 
 ## 📄 License

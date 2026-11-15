@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 
 KCMUtils.SimpleKCM {
     property string cfg_currency
+    property alias cfg_showMainStory: mainStoryCheck.checked
     property alias cfg_backgroundStyle: styleBox.currentIndex
     property alias cfg_glassOpacity: opacitySlider.value
     property alias cfg_islandStyle: islandBox.currentIndex
@@ -31,6 +32,22 @@ KCMUtils.SimpleKCM {
 
         QQC2.Label {
             text: i18n("Steam regional prices and verdicts for this store region.")
+            color: Kirigami.Theme.disabledTextColor
+            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+        }
+
+        Item { Kirigami.FormData.isSection: true }
+
+        QQC2.CheckBox {
+            id: mainStoryCheck
+            Kirigami.FormData.label: i18n("Search results:")
+            text: i18n("Show Main Story hours (HowLongToBeat)")
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+            wrapMode: Text.WordWrap
+            text: i18n("Adds a small \"32h\" next to each price. Looked-up hours are cached for 30 days.")
             color: Kirigami.Theme.disabledTextColor
             font.pixelSize: Kirigami.Theme.smallFont.pixelSize
         }

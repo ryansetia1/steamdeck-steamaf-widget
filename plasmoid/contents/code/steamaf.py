@@ -4,11 +4,13 @@
 Usage:
   steamaf.py search <CURRENCY> <query...>
   steamaf.py detail <CURRENCY> <appId> <title...>
+  steamaf.py hltb '[["<appId>", "<title>"], ...]'   -> {"hours": {"<appId>": <main story h>}}
 
 Prints one JSON object: {"ok": true, ...} or {"ok": false, "error": "..."}.
 Only the Python standard library is used.
 """
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -66,6 +68,11 @@ CURRENCIES = {
     "AUD": ("au", "AU", 2, "A$", ",", ".", False),
     "NZD": ("nz", "NZ", 2, "NZ$", ",", ".", False),
 }
+
+
+CACHE_FILE = os.path.join(os.path.expanduser("~"), ".cache", "steamaf-widget", "hltb.json")
+HLTB_TTL = 30 * 86400        # playtime barely changes (steamAF caches it 30 days too)
+HLTB_MISS_TTL = 3 * 86400    # "no HLTB entry" answers are re-checked sooner
 
 
 def get(path, params, timeout=20):
@@ -163,7 +170,7 @@ def detail(cur, app_id, title):
             d = get("/api/hltb", {"appId": app_id, "title": title}, timeout=25).get("data") or {}
         except Exception:
             return None
-        h = lambda x: round(float(x) * 2) / 2 if x else 0  # noqa: E731
+        h = half_hours
         return {"main": h(d.get("main")), "plus": h(d.get("mainPlus")), "full": h(d.get("complete"))} if d else None
 
     def header():
@@ -192,10 +199,64 @@ def detail(cur, app_id, title):
     }
 
 
+def half_hours(x):
+    return round(float(x) * 2) / 2 if x else 0
+
+
+def main_hours(pairs):
+    """Main-story hours for many games at once. Uses a small local cache so repeated searches
+    don't hit steamAF's /api/hltb (it is rate limited per IP) for games already looked up."""
+    try:
+        with open(CACHE_FILE) as f:
+            cache = json.load(f)
+    except Exception:
+        cache = {}
+    now = time.time()
+    out, todo = {}, []
+    for app_id, title in pairs:
+        c = cache.get(app_id)
+        if c and now - c["t"] < (HLTB_TTL if c["h"] else HLTB_MISS_TTL):
+            out[app_id] = c["h"]
+        else:
+            todo.append((app_id, title))
+
+    def one(pair):
+        app_id, title = pair
+        try:
+            r = get("/api/hltb", {"appId": app_id, "title": title}, timeout=25)
+        except Exception:
+            return app_id, None  # rate limited / upstream down: try again next search
+        if r.get("pending"):
+            return app_id, None
+        return app_id, half_hours((r.get("data") or {}).get("main"))
+
+    if todo:
+        with ThreadPoolExecutor(4) as ex:
+            for app_id, h in ex.map(one, todo):
+                if h is None:
+                    continue
+                out[app_id] = h
+                cache[app_id] = {"h": h, "t": now}
+        try:
+            os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+            with open(CACHE_FILE, "w") as f:
+                json.dump(cache, f)
+        except Exception:
+            pass
+    return {"hours": out}
+
+
 def main():
     args = sys.argv[1:]
+    if len(args) == 2 and args[0] == "hltb":
+        try:
+            pairs = [(str(i), str(t)) for i, t in json.loads(args[1])][:20]
+            print(json.dumps({"ok": True, **main_hours(pairs)}))
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": str(e)[:120]}))
+        return
     if len(args) < 3 or args[0] not in ("search", "detail"):
-        print(json.dumps({"ok": False, "error": "usage: search|detail CURRENCY ..."}))
+        print(json.dumps({"ok": False, "error": "usage: search|detail|hltb ..."}))
         return
     cmd, cur = args[0], args[1].upper()
     if cur not in CURRENCIES:

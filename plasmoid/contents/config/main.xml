@@ -9,6 +9,10 @@
       <label>Steam region / currency used for prices and verdicts</label>
       <default>USD</default>
     </entry>
+    <entry name="showMainStory" type="Bool">
+      <label>Show HowLongToBeat Main Story hours on each search result</label>
+      <default>false</default>
+    </entry>
   </group>
   <group name="Appearance">
     <entry name="backgroundStyle" type="Int">
