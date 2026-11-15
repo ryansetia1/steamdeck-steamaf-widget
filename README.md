@@ -28,6 +28,9 @@
 - **Typo-tolerant search** powered by steamAF, with capsule art, regional price, discount and
   a verdict badge for every result.
 - **Game detail** (click a result):
+  - **media carousel**: the cover first, then trailers and screenshots with ‹ › chevrons. Click
+    to open the **theater**: a full-screen view with the trailer playing (with sound, seek bar)
+    or the full-size screenshot, a thumbnail strip, ←/→ to browse and Esc to close
   - steamAF verdict with the same colours as the website
   - current price, discount, original price
   - 2-year low and usual sale price, sale countdown when a sale is running
@@ -70,6 +73,8 @@ plasmoid/
     └── ui/
         ├── main.qml           # search card + island (PlasmaCore.Dialog) with results/detail
         ├── VerdictBadge.qml
+        ├── MediaCarousel.qml  # cover / trailers / screenshots in the detail
+        ├── MediaTheater.qml   # full-screen viewer (QtMultimedia for trailers)
         └── configGeneral.qml
 ```
 
@@ -81,6 +86,7 @@ The helper only runs when you search or open a game. It uses steamAF's public en
 | Verdict badges for all results (one request) | `GET /api/status/snapshot?appIds=…&cc=…&country=…` |
 | Game detail / verdict | `GET /api/extension/v1/verdict?appId=…&currency=…` (+ `refresh=1` when stale) |
 | HowLongToBeat (detail, and per-result Main Story when enabled) | `GET /api/hltb?appId=…&title=…` |
+| Trailers + screenshots (Steam store, not steamAF) | `GET https://store.steampowered.com/api/appdetails?appids=…&filters=movies,screenshots` |
 
 Try it from a terminal:
 

@@ -18,6 +18,7 @@ Commit and push every affected repo so they stay in sync.**
 | `plasmoid/contents/code/steamaf.py` | `bin/games_steamaf.py` (imported by the daemon) | byte-identical |
 | `plasmoid/contents/ui/VerdictBadge.qml` | `plasmoid/contents/ui/VerdictBadge.qml` | byte-identical |
 | `plasmoid/contents/icons/steamaf.png` | `plasmoid/contents/icons/steamaf.png` | byte-identical |
+| `plasmoid/contents/ui/MediaCarousel.qml`, `MediaTheater.qml` | same paths | byte-identical |
 | `plasmoid/contents/ui/main.qml` (island, result rows, detail view) | `plasmoid/contents/ui/GamesSection.qml` (`af*` state, `detail`, `afList`) | adapted, port changes by hand |
 | config `currency`, `showMainStory`, `islandStyle`, `islandOpacity` | config group `Games`: `gamesCurrency`, `gamesMainStory`, `gamesIslandStyle`, `gamesIslandOpacity` | same meaning, different keys |
 
@@ -37,4 +38,8 @@ reinstalled and restarted (`systemctl --user restart deck-monitor.service`).
 - Island: `PlasmaCore.Dialog` with `type: Tooltip` (never takes keyboard focus), positioned by
   hand via `mapToGlobal`. Don't use `visualParent` auto-placement; it flipped the island above
   the widget.
+- Media: `detail` also returns `media` from the Steam store `appdetails` API (trailers as HLS
+  streams, screenshots). `MediaCarousel.qml` (cover first, ‹ › chevrons) opens `MediaTheater.qml`,
+  a full-screen Tooltip-type dialog that plays trailers via QtMultimedia. It never takes focus; the
+  search field forwards ←/→/Esc to it.
 - Install with `./install.sh`, then `systemctl --user restart plasma-plasmashell`.

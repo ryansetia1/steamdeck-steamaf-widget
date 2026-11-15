@@ -202,7 +202,22 @@ PlasmoidItem {
             }
         }
 
-        onIslandOpenChanged: if (islandOpen) island.place()
+        onIslandOpenChanged: { if (islandOpen) island.place(); else theater.close(); }
+        readonly property rect screenRect: Qt.rect(Screen.virtualX, Screen.virtualY, Screen.width, Screen.height)
+
+        // ── Theater: full-screen cover / trailers / screenshots ──
+        MediaTheater {
+            id: theater
+            items: carousel.items
+            title: root.detail ? (root.detail.name || "") : ""
+            appId: root.detail ? String(root.detail.id) : ""
+            screenRect: container.screenRect
+            onIndexPicked: (i) => carousel.currentIndex = i
+        }
+        Connections {
+            target: root
+            function onDetailChanged() { if (!root.detail) theater.close(); }
+        }
 
         // ── Search card (the widget itself) ──
         Rectangle {
@@ -260,8 +275,12 @@ PlasmoidItem {
                             verticalAlignment: TextInput.AlignVCenter
                             onTextChanged: { root.queryText = text; debounce.restart(); }
                             onAccepted: { debounce.stop(); root.closeDetail(); root.runSearch(text); }
+                            // While the theater is open, ←/→/Esc drive it (focus stays here)
+                            Keys.onLeftPressed: (e) => { if (theater.shown) theater.prev(); else e.accepted = false; }
+                            Keys.onRightPressed: (e) => { if (theater.shown) theater.next(); else e.accepted = false; }
                             Keys.onEscapePressed: {
-                                if (root.detail) root.closeDetail();
+                                if (theater.shown) theater.close();
+                                else if (root.detail) root.closeDetail();
                                 else if (text) text = "";
                                 else focus = false;
                             }
@@ -564,15 +583,16 @@ PlasmoidItem {
                                 }
                             }
 
-                            Kirigami.ShadowedImage {
+                            // Cover first, then trailers + screenshots; click opens the theater
+                            MediaCarousel {
+                                id: carousel
                                 width: parent.width
-                                height: Math.round(width * 215 / 460)
-                                radius: 8
-                                color: root.tileColor("#212532")
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                source: root.detail ? (root.detail.image
+                                height: implicitHeight
+                                baseColor: root.tileColor("#212532")
+                                cover: root.detail ? (root.detail.image
                                     || "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + root.detail.id + "/header.jpg") : ""
+                                media: root.detail && root.detail.media ? root.detail.media : []
+                                onOpenRequested: (i) => theater.open(i)
                             }
 
                             // Loading / error
