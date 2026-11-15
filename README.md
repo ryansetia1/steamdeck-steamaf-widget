@@ -1,7 +1,11 @@
 # 🛒 steamAF Widget for Steam Deck
 
 <p align="center">
-  <img src="assets/preview-empty.png" alt="steamAF widget" width="320" />
+  <img src="assets/preview-search.png" alt="Search results with verdict badges" width="300" />
+  &nbsp;
+  <img src="assets/preview-detail.png" alt="Game detail: verdict, prices and HowLongToBeat" width="300" />
+  <br /><br />
+  <img src="assets/preview-empty.png" alt="Idle: just the search bar" width="300" />
 </p>
 
 <p align="center">
