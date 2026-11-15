@@ -659,9 +659,9 @@ PlasmoidItem {
                                         spacing: 6
                                         Repeater {
                                             model: priceTile.ready && root.detail.hltb ? [
-                                                { label: "Main", value: root.detail.hltb.main, accent: "#4a8fe7" },
-                                                { label: "Main+", value: root.detail.hltb.plus, accent: "#a78bfa" },
-                                                { label: "100%", value: root.detail.hltb.full, accent: "#f87171" }
+                                                { label: "Main", value: root.detail.hltb.main, accent: "#f87171" },
+                                                { label: "Main+", value: root.detail.hltb.plus, accent: "#64748b" },
+                                                { label: "100%", value: root.detail.hltb.full, accent: "#64748b" }
                                             ] : []
                                             delegate: Rectangle {
                                                 required property var modelData
