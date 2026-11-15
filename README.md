@@ -21,7 +21,10 @@
 
 ## ✨ Features
 
-- **Just a search bar when idle**; the card grows to fit results (up to 10, then scrolls).
+- **Just a search bar** (~54 px tall), so it stacks tightly with other widgets.
+- **Floating island** for results and game detail: a rounded card right under the search bar,
+  drawn *above* other widgets (up to 10 results, then scrolls). Typing keeps working while it is
+  open; it closes when you click elsewhere and comes back when you focus the search again.
 - **Typo-tolerant search** powered by steamAF, with capsule art, regional price, discount and
   a verdict badge for every result.
 - **Game detail** (click a result):
@@ -46,7 +49,7 @@ systemctl --user restart plasma-plasmashell
 ```
 
 Then right-click the desktop → **Add Widgets** → search for **steamAF** and drag it onto the desktop.
-Give the widget box room to grow (~320×720); only the card itself is drawn.
+Size the widget box to just the search bar (~320×56); the island is a separate popup window.
 
 To remove: `./uninstall.sh`.
 
@@ -59,7 +62,7 @@ plasmoid/
     ├── code/steamaf.py        # calls the steamAF API, prints JSON
     ├── config/                # currency + appearance settings
     └── ui/
-        ├── main.qml           # search bar, results, detail view
+        ├── main.qml           # search card + island (PlasmaCore.Dialog) with results/detail
         ├── VerdictBadge.qml
         └── configGeneral.qml
 ```

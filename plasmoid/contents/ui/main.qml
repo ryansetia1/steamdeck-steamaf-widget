@@ -12,9 +12,11 @@ PlasmoidItem {
     preferredRepresentation: fullRepresentation
 
     implicitWidth: 320
-    implicitHeight: 720   // transparent room; the card only grows as tall as its content
+    // The widget itself is only the search bar. Results and the game detail open in a floating
+    // "island" window (PlasmaCore.Dialog) drawn above other widgets, so widgets stack tightly.
+    implicitHeight: 54
     Layout.minimumWidth: 300
-    Layout.minimumHeight: 70
+    Layout.minimumHeight: 54
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
 
@@ -151,34 +153,41 @@ PlasmoidItem {
         anchors.fill: parent
 
         readonly property int pad: 8
+        readonly property int gap: 6        // space between the search card and the island
         readonly property int rowH: 58
         readonly property int rowGap: 6
         readonly property int maxRows: 10
+        readonly property bool hasIslandContent: !!root.detail || root.results.length > 0 || statusLine.shown
+        // Open while there is something to show and the search field has focus. Clicking
+        // elsewhere (another window, the desktop) drops focus and closes it; results are kept,
+        // so focusing the field again brings the island back.
+        readonly property bool islandOpen: hasIslandContent && input.activeFocus
 
+        readonly property color cardColor: root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, root.glassOpacity) : "#161820"
+        readonly property color cardBorder: root.glassMode ? Qt.rgba(1, 1, 1, 0.22) : "#262a36"
+        // The island floats over other widgets, so it stays nearly opaque even in glass mode.
+        readonly property color islandColor: root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, Math.max(root.glassOpacity, 0.94)) : "#161820"
+
+        onIslandOpenChanged: if (islandOpen) island.place()
+
+        // ── Search card (the widget itself) ──
         Rectangle {
             id: card
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: Math.min(content.implicitHeight + 2 * container.pad, container.height)
-            clip: true
-            color: root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, root.glassOpacity) : "#161820"
+            height: 2 * container.pad + 38
+            color: container.cardColor
             radius: 16
-            border.color: root.glassMode ? Qt.rgba(1, 1, 1, 0.22) : "#262a36"
+            border.color: container.cardBorder
             border.width: 1
 
-            Behavior on height {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-            }
-
-            Column {
-                id: content
+            Item {
                 x: container.pad
                 y: container.pad
                 width: card.width - 2 * container.pad
-                spacing: container.pad
+                height: 38
 
-                // ── Search bar ──
                 Rectangle {
                     width: parent.width
                     height: 38
@@ -219,7 +228,8 @@ PlasmoidItem {
                             onAccepted: { debounce.stop(); root.closeDetail(); root.runSearch(text); }
                             Keys.onEscapePressed: {
                                 if (root.detail) root.closeDetail();
-                                else text = "";
+                                else if (text) text = "";
+                                else focus = false;
                             }
 
                             Text {
@@ -293,358 +303,417 @@ PlasmoidItem {
                         onTriggered: { root.closeDetail(); root.runSearch(input.text); }
                     }
                 }
+            }
+        }
 
-                // ── Status line (list mode) ──
-                Text {
-                    readonly property bool shown: !root.detail && root.results.length === 0
-                        && (root.loading || root.errorText.length > 0 || root.lastQuery.length >= 2)
-                    visible: shown
-                    width: parent.width
-                    height: 28
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                    color: root.errorText ? "#ff6b6b" : "#6b7385"
-                    font.pixelSize: 12
-                    text: root.loading ? "Searching…" : (root.errorText || "No games found")
-                }
+        // ── Island: results + detail in their own floating window ──
+        // Tooltip-type windows are never activated by the window manager, so typing stays in
+        // the search field while the island is open, yet it still takes clicks and scrolling.
+        PlasmaCore.Dialog {
+            id: island
+            // Positioned by hand right under the search card (the automatic visualParent
+            // placement flips the island above the widget when it thinks space is short).
+            location: PlasmaCore.Types.Floating
+            type: PlasmaCore.Dialog.Tooltip
+            backgroundHints: PlasmaCore.Dialog.NoBackground
+            flags: Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+            visible: container.islandOpen
+            onVisibleChanged: if (visible) place()
 
-                // ── Results list ──
-                ListView {
-                    id: list
-                    readonly property int shownRows: Math.min(root.results.length, container.maxRows)
-                    visible: !root.detail && root.results.length > 0
+            function place() {
+                var p = card.mapToGlobal(0, card.height);
+                island.x = Math.round(p.x);
+                island.y = Math.round(p.y);
+            }
+
+            mainItem: Item {
+                width: card.width
+                height: container.gap + islandCard.height
+
+                Rectangle {
+                    id: islandCard
+                    y: container.gap
                     width: parent.width
-                    height: visible ? shownRows * container.rowH + Math.max(0, shownRows - 1) * container.rowGap : 0
-                    model: root.results
-                    spacing: container.rowGap
+                    height: content.implicitHeight + 2 * container.pad
                     clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    opacity: root.loading ? 0.5 : 1
-                    Behavior on opacity { NumberAnimation { duration: 120 } }
+                    color: container.islandColor
+                    radius: 16
+                    border.color: container.cardBorder
+                    border.width: 1
 
-                    delegate: Rectangle {
-                        id: row
-                        required property var modelData
-                        width: ListView.view.width
-                        height: container.rowH
-                        radius: 10
-                        color: rowArea.containsMouse ? (root.glassMode ? Qt.rgba(1, 1, 1, 0.14) : "#283041") : root.tileColor("#212532")
-
-                        MouseArea {
-                            id: rowArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.openDetail(row.modelData.id, row.modelData.name)
-                        }
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 10
-
-                            Kirigami.ShadowedImage {
-                                Layout.preferredWidth: 100
-                                Layout.preferredHeight: 38
-                                radius: 5
-                                color: root.tileColor("#2a2f3d")
-                                source: row.modelData.thumb
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                            }
-
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 4
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: row.modelData.name
-                                    color: "#ffffff"
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    elide: Text.ElideRight
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 6
-                                    Text {
-                                        text: row.modelData.price || "—"
-                                        color: row.modelData.state ? root.verdictColor(row.modelData.state) : "#cfd8dc"
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                    }
-                                    Rectangle {
-                                        visible: row.modelData.discount > 0
-                                        Layout.preferredHeight: 15
-                                        Layout.preferredWidth: discText.implicitWidth + 8
-                                        radius: 4
-                                        color: Qt.rgba(0.20, 0.83, 0.60, 0.2)
-                                        Text {
-                                            id: discText
-                                            anchors.centerIn: parent
-                                            text: "-" + row.modelData.discount + "%"
-                                            color: "#8bd0b7"
-                                            font.pixelSize: 9
-                                            font.bold: true
-                                        }
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    VerdictBadge { verdict: row.modelData.state; small: true }
-                                }
-                            }
-                        }
+                    // Drop-in: fade + slide each time the island opens
+                    opacity: 0
+                    transform: Translate { id: slide; y: -8 }
+                    states: State {
+                        name: "open"; when: container.islandOpen
+                        PropertyChanges { islandCard.opacity: 1; slide.y: 0 }
                     }
-                }
+                    transitions: Transition {
+                        to: "open"
+                        NumberAnimation { properties: "opacity,y"; duration: 160; easing.type: Easing.OutCubic }
+                    }
 
-                // ── Detail view ──
-                Column {
-                    id: detailView
-                    visible: !!root.detail
-                    width: parent.width
-                    spacing: container.pad
+                    Column {
+                        id: content
+                        x: container.pad
+                        y: container.pad
+                        width: islandCard.width - 2 * container.pad
+                        spacing: container.pad
 
-                    // Title row with back button
-                    RowLayout {
-                        width: parent.width
-                        spacing: 8
-
-                        Rectangle {
-                            Layout.preferredWidth: 26
-                            Layout.preferredHeight: 26
-                            radius: 13
-                            color: backArea.containsMouse ? root.tileColor("#2f3647") : root.tileColor("#212532")
-                            Text {
-                                anchors.centerIn: parent
-                                anchors.horizontalCenterOffset: -1
-                                text: "‹"
-                                color: "#cfd8dc"
-                                font.pixelSize: 18
-                                font.bold: true
-                            }
-                            MouseArea {
-                                id: backArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.closeDetail()
-                            }
-                        }
+                        // ── Status line (list mode) ──
                         Text {
-                            Layout.fillWidth: true
-                            text: root.detail ? root.detail.name : ""
-                            color: "#ffffff"
-                            font.pixelSize: 13
-                            font.bold: true
+                            id: statusLine
+                            readonly property bool shown: !root.detail && root.results.length === 0
+                                && (root.loading || root.errorText.length > 0 || root.lastQuery.length >= 2)
+                            visible: shown
+                            width: parent.width
+                            height: 28
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
+                            color: root.errorText ? "#ff6b6b" : "#6b7385"
+                            font.pixelSize: 12
+                            text: root.loading ? "Searching…" : (root.errorText || "No games found")
                         }
-                        VerdictBadge {
-                            verdict: root.detail && !root.detailLoading ? (root.detail.state || "") : ""
-                        }
-                    }
 
-                    Kirigami.ShadowedImage {
-                        width: parent.width
-                        height: Math.round(width * 215 / 460)
-                        radius: 8
-                        color: root.tileColor("#212532")
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        source: root.detail ? (root.detail.image
-                            || "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + root.detail.id + "/header.jpg") : ""
-                    }
+                        // ── Results list ──
+                        ListView {
+                            id: list
+                            readonly property int shownRows: Math.min(root.results.length, container.maxRows)
+                            visible: !root.detail && root.results.length > 0
+                            width: parent.width
+                            height: visible ? shownRows * container.rowH + Math.max(0, shownRows - 1) * container.rowGap : 0
+                            model: root.results
+                            spacing: container.rowGap
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            opacity: root.loading ? 0.5 : 1
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
 
-                    // Loading / error
-                    Text {
-                        visible: root.detailLoading || root.detailError.length > 0
-                        width: parent.width
-                        height: 40
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        color: root.detailError ? "#ff6b6b" : "#6b7385"
-                        font.pixelSize: 12
-                        text: root.detailError || "Checking prices…"
-                    }
-
-                    // Price block
-                    Rectangle {
-                        id: priceTile
-                        readonly property bool ready: !!root.detail && !root.detailLoading && !root.detailError && root.detail.state !== undefined
-                        readonly property color tone: ready ? root.verdictColor(root.detail.state) : "#cfd8dc"
-                        visible: ready
-                        width: parent.width
-                        height: priceCol.implicitHeight + 20
-                        radius: 10
-                        color: root.tileColor("#212532")
-
-                        Column {
-                            id: priceCol
-                            x: 10; y: 10
-                            width: parent.width - 20
-                            spacing: 8
-
-                            RowLayout {
-                                width: parent.width
-                                spacing: 8
-                                Text {
-                                    text: priceTile.ready ? (root.detail.current || root.verdictLabel(root.detail.state) || "—") : ""
-                                    color: priceTile.tone
-                                    font.pixelSize: 20
-                                    font.bold: true
-                                }
-                                Rectangle {
-                                    visible: priceTile.ready && root.detail.discount > 0
-                                    Layout.preferredHeight: 18
-                                    Layout.preferredWidth: dText.implicitWidth + 10
-                                    radius: 5
-                                    color: Qt.rgba(0.20, 0.83, 0.60, 0.2)
-                                    Text {
-                                        id: dText
-                                        anchors.centerIn: parent
-                                        text: priceTile.ready ? "-" + root.detail.discount + "%" : ""
-                                        color: "#8bd0b7"
-                                        font.pixelSize: 11
-                                        font.bold: true
-                                    }
-                                }
-                                Text {
-                                    visible: priceTile.ready && root.detail.discount > 0 && !!root.detail.original
-                                    text: priceTile.ready ? (root.detail.original || "") : ""
-                                    color: "#6b7385"
-                                    font.pixelSize: 11
-                                    font.strikeout: true
-                                }
-                                Item { Layout.fillWidth: true }
-                            }
-
-                            Text {
-                                width: parent.width
-                                wrapMode: Text.WordWrap
-                                text: priceTile.ready ? root.verdictText(root.detail) : ""
-                                color: "#cfd8dc"
-                                font.pixelSize: 11
-                            }
-
-                            Text {
-                                visible: priceTile.ready && !!root.detail.sale
-                                text: priceTile.ready ? ("⏱ " + (root.detail.sale || "")) : ""
-                                color: "#fbbf24"
-                                font.pixelSize: 11
-                                font.bold: true
-                            }
-
-                            // 2-year low / usual sale
-                            RowLayout {
-                                visible: priceTile.ready && (!!root.detail.lowest || !!root.detail.typical)
-                                width: parent.width
-                                spacing: 6
-                                Repeater {
-                                    model: priceTile.ready ? [
-                                        { label: "2-YEAR LOW", value: root.detail.lowest },
-                                        { label: "USUAL SALE", value: root.detail.typical }
-                                    ] : []
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 36
-                                        radius: 7
-                                        color: root.glassMode ? Qt.rgba(0, 0, 0, 0.22) : "#1a1d27"
-                                        Column {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 9
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            Text { text: modelData.label; color: "#90a4ae"; font.pixelSize: 9; font.bold: true }
-                                            Text { text: modelData.value || "—"; color: "#ffffff"; font.pixelSize: 12; font.bold: true }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // HowLongToBeat
-                    Rectangle {
-                        visible: priceTile.ready && !!root.detail.hltb
-                        width: parent.width
-                        height: 62
-                        radius: 10
-                        color: root.tileColor("#212532")
-
-                        Column {
-                            x: 10; y: 8
-                            width: parent.width - 20
-                            spacing: 5
-                            Text { text: "HOWLONGTOBEAT"; color: "#90a4ae"; font.pixelSize: 9; font.bold: true }
-                            RowLayout {
-                                width: parent.width
-                                spacing: 6
-                                Repeater {
-                                    model: priceTile.ready && root.detail.hltb ? [
-                                        { label: "Main", value: root.detail.hltb.main, accent: "#4a8fe7" },
-                                        { label: "Main+", value: root.detail.hltb.plus, accent: "#a78bfa" },
-                                        { label: "100%", value: root.detail.hltb.full, accent: "#f87171" }
-                                    ] : []
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 28
-                                        radius: 6
-                                        color: root.glassMode ? Qt.rgba(0, 0, 0, 0.22) : "#1a1d27"
-                                        Rectangle {
-                                            width: 3; height: parent.height - 12; radius: 1.5
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 6
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            color: modelData.accent
-                                        }
-                                        Text {
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 14
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            textFormat: Text.StyledText
-                                            text: "<font color='#90a4ae'>" + modelData.label + "</font>  <b>" + root.fmtHours(modelData.value) + "</b>"
-                                            color: "#ffffff"
-                                            font.pixelSize: 11
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Links
-                    RowLayout {
-                        visible: !!root.detail
-                        width: parent.width
-                        spacing: 6
-                        Repeater {
-                            model: root.detail ? [
-                                { label: "Open in Steam", url: "https://store.steampowered.com/app/" + root.detail.id },
-                                { label: "Open steamAF", url: "https://steamaf.vercel.app/game/" + root.detail.id }
-                            ] : []
                             delegate: Rectangle {
+                                id: row
                                 required property var modelData
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 30
-                                radius: 8
-                                color: linkArea.containsMouse ? root.tileColor("#2f3647") : root.tileColor("#212532")
-                                border.color: root.tileColor("#2c3242")
-                                border.width: 1
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.label
-                                    color: "#cfd8dc"
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                }
+                                width: ListView.view.width
+                                height: container.rowH
+                                radius: 10
+                                color: rowArea.containsMouse ? (root.glassMode ? Qt.rgba(1, 1, 1, 0.14) : "#283041") : root.tileColor("#212532")
+
                                 MouseArea {
-                                    id: linkArea
+                                    id: rowArea
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: Qt.openUrlExternally(modelData.url)
+                                    onClicked: root.openDetail(row.modelData.id, row.modelData.name)
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 10
+
+                                    Kirigami.ShadowedImage {
+                                        Layout.preferredWidth: 100
+                                        Layout.preferredHeight: 38
+                                        radius: 5
+                                        color: root.tileColor("#2a2f3d")
+                                        source: row.modelData.thumb
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 4
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: row.modelData.name
+                                            color: "#ffffff"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Text {
+                                                text: row.modelData.price || "—"
+                                                color: row.modelData.state ? root.verdictColor(row.modelData.state) : "#cfd8dc"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                            }
+                                            Rectangle {
+                                                visible: row.modelData.discount > 0
+                                                Layout.preferredHeight: 15
+                                                Layout.preferredWidth: discText.implicitWidth + 8
+                                                radius: 4
+                                                color: Qt.rgba(0.20, 0.83, 0.60, 0.2)
+                                                Text {
+                                                    id: discText
+                                                    anchors.centerIn: parent
+                                                    text: "-" + row.modelData.discount + "%"
+                                                    color: "#8bd0b7"
+                                                    font.pixelSize: 9
+                                                    font.bold: true
+                                                }
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            VerdictBadge { verdict: row.modelData.state; small: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Detail view ──
+                        Column {
+                            id: detailView
+                            visible: !!root.detail
+                            width: parent.width
+                            spacing: container.pad
+
+                            // Title row with back button
+                            RowLayout {
+                                width: parent.width
+                                spacing: 8
+
+                                Rectangle {
+                                    Layout.preferredWidth: 26
+                                    Layout.preferredHeight: 26
+                                    radius: 13
+                                    color: backArea.containsMouse ? root.tileColor("#2f3647") : root.tileColor("#212532")
+                                    Text {
+                                        anchors.centerIn: parent
+                                        anchors.horizontalCenterOffset: -1
+                                        text: "‹"
+                                        color: "#cfd8dc"
+                                        font.pixelSize: 18
+                                        font.bold: true
+                                    }
+                                    MouseArea {
+                                        id: backArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.closeDetail()
+                                    }
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: root.detail ? root.detail.name : ""
+                                    color: "#ffffff"
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+                                VerdictBadge {
+                                    verdict: root.detail && !root.detailLoading ? (root.detail.state || "") : ""
+                                }
+                            }
+
+                            Kirigami.ShadowedImage {
+                                width: parent.width
+                                height: Math.round(width * 215 / 460)
+                                radius: 8
+                                color: root.tileColor("#212532")
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                source: root.detail ? (root.detail.image
+                                    || "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + root.detail.id + "/header.jpg") : ""
+                            }
+
+                            // Loading / error
+                            Text {
+                                visible: root.detailLoading || root.detailError.length > 0
+                                width: parent.width
+                                height: 40
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                color: root.detailError ? "#ff6b6b" : "#6b7385"
+                                font.pixelSize: 12
+                                text: root.detailError || "Checking prices…"
+                            }
+
+                            // Price block
+                            Rectangle {
+                                id: priceTile
+                                readonly property bool ready: !!root.detail && !root.detailLoading && !root.detailError && root.detail.state !== undefined
+                                readonly property color tone: ready ? root.verdictColor(root.detail.state) : "#cfd8dc"
+                                visible: ready
+                                width: parent.width
+                                height: priceCol.implicitHeight + 20
+                                radius: 10
+                                color: root.tileColor("#212532")
+
+                                Column {
+                                    id: priceCol
+                                    x: 10; y: 10
+                                    width: parent.width - 20
+                                    spacing: 8
+
+                                    RowLayout {
+                                        width: parent.width
+                                        spacing: 8
+                                        Text {
+                                            text: priceTile.ready ? (root.detail.current || root.verdictLabel(root.detail.state) || "—") : ""
+                                            color: priceTile.tone
+                                            font.pixelSize: 20
+                                            font.bold: true
+                                        }
+                                        Rectangle {
+                                            visible: priceTile.ready && root.detail.discount > 0
+                                            Layout.preferredHeight: 18
+                                            Layout.preferredWidth: dText.implicitWidth + 10
+                                            radius: 5
+                                            color: Qt.rgba(0.20, 0.83, 0.60, 0.2)
+                                            Text {
+                                                id: dText
+                                                anchors.centerIn: parent
+                                                text: priceTile.ready ? "-" + root.detail.discount + "%" : ""
+                                                color: "#8bd0b7"
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                            }
+                                        }
+                                        Text {
+                                            visible: priceTile.ready && root.detail.discount > 0 && !!root.detail.original
+                                            text: priceTile.ready ? (root.detail.original || "") : ""
+                                            color: "#6b7385"
+                                            font.pixelSize: 11
+                                            font.strikeout: true
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        wrapMode: Text.WordWrap
+                                        text: priceTile.ready ? root.verdictText(root.detail) : ""
+                                        color: "#cfd8dc"
+                                        font.pixelSize: 11
+                                    }
+
+                                    Text {
+                                        visible: priceTile.ready && !!root.detail.sale
+                                        text: priceTile.ready ? ("⏱ " + (root.detail.sale || "")) : ""
+                                        color: "#fbbf24"
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                    }
+
+                                    // 2-year low / usual sale
+                                    RowLayout {
+                                        visible: priceTile.ready && (!!root.detail.lowest || !!root.detail.typical)
+                                        width: parent.width
+                                        spacing: 6
+                                        Repeater {
+                                            model: priceTile.ready ? [
+                                                { label: "2-YEAR LOW", value: root.detail.lowest },
+                                                { label: "USUAL SALE", value: root.detail.typical }
+                                            ] : []
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 36
+                                                radius: 7
+                                                color: root.glassMode ? Qt.rgba(0, 0, 0, 0.22) : "#1a1d27"
+                                                Column {
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 9
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    Text { text: modelData.label; color: "#90a4ae"; font.pixelSize: 9; font.bold: true }
+                                                    Text { text: modelData.value || "—"; color: "#ffffff"; font.pixelSize: 12; font.bold: true }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // HowLongToBeat
+                            Rectangle {
+                                visible: priceTile.ready && !!root.detail.hltb
+                                width: parent.width
+                                height: 62
+                                radius: 10
+                                color: root.tileColor("#212532")
+
+                                Column {
+                                    x: 10; y: 8
+                                    width: parent.width - 20
+                                    spacing: 5
+                                    Text { text: "HOWLONGTOBEAT"; color: "#90a4ae"; font.pixelSize: 9; font.bold: true }
+                                    RowLayout {
+                                        width: parent.width
+                                        spacing: 6
+                                        Repeater {
+                                            model: priceTile.ready && root.detail.hltb ? [
+                                                { label: "Main", value: root.detail.hltb.main, accent: "#4a8fe7" },
+                                                { label: "Main+", value: root.detail.hltb.plus, accent: "#a78bfa" },
+                                                { label: "100%", value: root.detail.hltb.full, accent: "#f87171" }
+                                            ] : []
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 28
+                                                radius: 6
+                                                color: root.glassMode ? Qt.rgba(0, 0, 0, 0.22) : "#1a1d27"
+                                                Rectangle {
+                                                    width: 3; height: parent.height - 12; radius: 1.5
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 6
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    color: modelData.accent
+                                                }
+                                                Text {
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 14
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    textFormat: Text.StyledText
+                                                    text: "<font color='#90a4ae'>" + modelData.label + "</font>  <b>" + root.fmtHours(modelData.value) + "</b>"
+                                                    color: "#ffffff"
+                                                    font.pixelSize: 11
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Links
+                            RowLayout {
+                                visible: !!root.detail
+                                width: parent.width
+                                spacing: 6
+                                Repeater {
+                                    model: root.detail ? [
+                                        { label: "Open in Steam", url: "https://store.steampowered.com/app/" + root.detail.id },
+                                        { label: "Open steamAF", url: "https://steamaf.vercel.app/game/" + root.detail.id }
+                                    ] : []
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 30
+                                        radius: 8
+                                        color: linkArea.containsMouse ? root.tileColor("#2f3647") : root.tileColor("#212532")
+                                        border.color: root.tileColor("#2c3242")
+                                        border.width: 1
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.label
+                                            color: "#cfd8dc"
+                                            font.pixelSize: 11
+                                            font.bold: true
+                                        }
+                                        MouseArea {
+                                            id: linkArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: Qt.openUrlExternally(modelData.url)
+                                        }
+                                    }
                                 }
                             }
                         }
