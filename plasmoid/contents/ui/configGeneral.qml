@@ -8,6 +8,8 @@ KCMUtils.SimpleKCM {
     property string cfg_currency
     property alias cfg_backgroundStyle: styleBox.currentIndex
     property alias cfg_glassOpacity: opacitySlider.value
+    property alias cfg_islandStyle: islandBox.currentIndex
+    property alias cfg_islandOpacity: islandSlider.value
 
     // Same regions steamAF supports (lib/price.ts CURRENCY_CATALOG)
     readonly property var currencies: [
@@ -60,6 +62,43 @@ KCMUtils.SimpleKCM {
                 font.bold: true
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 3
             }
+        }
+
+        Item { Kirigami.FormData.isSection: true }
+
+        QQC2.ComboBox {
+            id: islandBox
+            Kirigami.FormData.label: i18n("Results island:")
+            model: [i18n("Auto (stays readable)"), i18n("Same as widget"), i18n("Custom opacity")]
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Island opacity:")
+            enabled: islandBox.currentIndex === 2
+            spacing: Kirigami.Units.largeSpacing
+
+            QQC2.Slider {
+                id: islandSlider
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                from: 10
+                to: 100
+                stepSize: 5
+                snapMode: QQC2.Slider.SnapAlways
+            }
+
+            QQC2.Label {
+                text: islandSlider.value + " %"
+                font.bold: true
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 3
+            }
+        }
+
+        QQC2.Label {
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+            wrapMode: Text.WordWrap
+            text: i18n("The island floats over other widgets. A low opacity looks nicer but text underneath can show through.")
+            color: Kirigami.Theme.disabledTextColor
+            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
         }
     }
 }

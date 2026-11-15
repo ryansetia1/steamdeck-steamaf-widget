@@ -23,6 +23,8 @@ PlasmoidItem {
     // ── Settings ────────────────────────────────────────────────────────────
     property bool glassMode: Plasmoid.configuration ? Plasmoid.configuration.backgroundStyle === 1 : false
     property real glassOpacity: ((Plasmoid.configuration && Plasmoid.configuration.glassOpacity) || 55) / 100
+    property int islandStyle: (Plasmoid.configuration && Plasmoid.configuration.islandStyle) || 0
+    property real islandOpacity: ((Plasmoid.configuration && Plasmoid.configuration.islandOpacity) || 94) / 100
     property string currency: (Plasmoid.configuration && Plasmoid.configuration.currency) || "USD"
     onCurrencyChanged: {
         if (root.detail) root.openDetail(root.detail.id, root.detail.name);
@@ -166,7 +168,15 @@ PlasmoidItem {
         readonly property color cardColor: root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, root.glassOpacity) : "#161820"
         readonly property color cardBorder: root.glassMode ? Qt.rgba(1, 1, 1, 0.22) : "#262a36"
         // The island floats over other widgets, so it stays nearly opaque even in glass mode.
-        readonly property color islandColor: root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, Math.max(root.glassOpacity, 0.94)) : "#161820"
+        // islandStyle: 0 = auto (solid, or at least 94% in glass mode), 1 = same as the widget,
+        // 2 = custom opacity.
+        readonly property color islandColor: {
+            switch (root.islandStyle) {
+            case 1: return cardColor;
+            case 2: return Qt.rgba(0.09, 0.10, 0.14, root.islandOpacity);
+            default: return root.glassMode ? Qt.rgba(0.09, 0.10, 0.14, Math.max(root.glassOpacity, 0.94)) : "#161820";
+            }
+        }
 
         onIslandOpenChanged: if (islandOpen) island.place()
 

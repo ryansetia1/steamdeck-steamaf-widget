@@ -38,6 +38,8 @@
 - **Solid or Glass background**, designed to sit next to the
   [Steam Deck Monitor](https://github.com/ryansetia1/steamdeck-monitor-widget) and
   [HLTB Search](https://github.com/ryansetia1/steamdeck-hltb-widget) widgets.
+- **Results island background**: Auto (stays readable over other widgets), Same as widget,
+  or Custom opacity.
 
 ## 📦 Install
 

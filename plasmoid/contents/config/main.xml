@@ -19,5 +19,13 @@
       <label>Glass background opacity (percent)</label>
       <default>55</default>
     </entry>
+    <entry name="islandStyle" type="Int">
+      <label>Results island background (0 = auto/readable, 1 = same as widget, 2 = custom opacity)</label>
+      <default>0</default>
+    </entry>
+    <entry name="islandOpacity" type="Int">
+      <label>Results island opacity (percent), used when islandStyle = 2</label>
+      <default>94</default>
+    </entry>
   </group>
 </kcfg>
