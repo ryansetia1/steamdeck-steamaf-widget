@@ -1,0 +1,15 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{ "Name": "Ryan" }],
+        "Category": "Utilities",
+        "Description": "Search Steam games and see the steamAF buy verdict, regional prices and HowLongToBeat times",
+        "Icon": "steam",
+        "Id": "org.ryan.steamaf",
+        "License": "GPL-2.0+",
+        "Name": "steamAF",
+        "Version": "0.1.0",
+        "Website": "https://steamaf.vercel.app"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

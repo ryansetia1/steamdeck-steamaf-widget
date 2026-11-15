@@ -1,0 +1,81 @@
+# 🛒 steamAF Widget for Steam Deck
+
+<p align="center">
+  <img src="assets/preview-empty.png" alt="steamAF widget" width="320" />
+</p>
+
+<p align="center">
+  A tiny <b>KDE Plasma 6</b> desktop widget for the <b>Steam Deck</b> that brings
+  <a href="https://steamaf.vercel.app">steamAF</a> to your desktop: search a Steam game and see
+  whether today's price is <b>Worth it</b>, a <b>Good deal</b>, <b>No rush</b> or a <b>Wait</b>,
+  plus how long it takes to beat.
+  <br />
+  Native QML front-end + a zero-dependency Python helper (standard library only). No daemon.
+</p>
+
+---
+
+## ✨ Features
+
+- **Just a search bar when idle**; the card grows to fit results (up to 10, then scrolls).
+- **Typo-tolerant search** powered by steamAF, with capsule art, regional price, discount and
+  a verdict badge for every result.
+- **Game detail** (click a result):
+  - steamAF verdict with the same colours as the website
+  - current price, discount, original price
+  - 2-year low and usual sale price, sale countdown when a sale is running
+  - **HowLongToBeat** Main / Main+ / 100% times
+  - quick links to the Steam store page and steamAF
+- **44 Steam regions** – pick your currency in the settings (the `USD` chip in the search bar
+  opens them). The choice is saved with the widget.
+- **Solid or Glass background**, designed to sit next to the
+  [Steam Deck Monitor](https://github.com/ryansetia1/steamdeck-monitor-widget) and
+  [HLTB Search](https://github.com/ryansetia1/steamdeck-hltb-widget) widgets.
+
+## 📦 Install
+
+```bash
+git clone https://github.com/ryansetia1/steamdeck-steamaf-widget.git
+cd steamdeck-steamaf-widget
+./install.sh
+systemctl --user restart plasma-plasmashell
+```
+
+Then right-click the desktop → **Add Widgets** → search for **steamAF** and drag it onto the desktop.
+Give the widget box room to grow (~320×720); only the card itself is drawn.
+
+To remove: `./uninstall.sh`.
+
+## 🔧 How it works
+
+```
+plasmoid/
+├── metadata.json
+└── contents/
+    ├── code/steamaf.py        # calls the steamAF API, prints JSON
+    ├── config/                # currency + appearance settings
+    └── ui/
+        ├── main.qml           # search bar, results, detail view
+        ├── VerdictBadge.qml
+        └── configGeneral.qml
+```
+
+The helper only runs when you search or open a game. It uses steamAF's public endpoints:
+
+| Purpose | Endpoint |
+|---|---|
+| Search | `GET /api/search?q=…&cc=…` |
+| Verdict badges for all results (one request) | `GET /api/status/snapshot?appIds=…&cc=…&country=…` |
+| Game detail / verdict | `GET /api/extension/v1/verdict?appId=…&currency=…` (+ `refresh=1` when stale) |
+| HowLongToBeat | `GET /api/hltb?appId=…&title=…` |
+
+Try it from a terminal:
+
+```bash
+python3 plasmoid/contents/code/steamaf.py search USD hades
+python3 plasmoid/contents/code/steamaf.py detail IDR 1145360 Hades
+```
+
+## 📄 License
+
+GPL-2.0-or-later – see [LICENSE](LICENSE).
